@@ -1,7 +1,3 @@
-// Prompt composers for the atom runtime. Mirrors Koog's buildSystemPrompt,
-// buildInitialUserMessage, and injectedWithMcpResources. Reference:
-// coral-koog-agent/src/main/kotlin/.../fullexample/util/coral/CoralMCPUtils.kt
-
 export interface BuildSystemPromptInput {
   systemPrompt: string;
   extraSystemPrompt: string;
@@ -9,6 +5,12 @@ export interface BuildSystemPromptInput {
   stateResource: string;
 }
 
+/**
+ * Substitutes literal <resource>coral://X</resource> or <resource uri="coral://X"/>
+ * tags in the prompt with the fetched resource bodies. Called by runAtom when the
+ * prompt contains at least one <resource tag. Server does NOT auto-expand
+ * (spike 2026-04-19, docs/spikes/resource-expansion-result.md).
+ */
 export function buildSystemPrompt(input: BuildSystemPromptInput): string {
   let combined = input.systemPrompt;
   if (input.extraSystemPrompt.trim().length > 0) {
@@ -20,15 +22,14 @@ export function buildSystemPrompt(input: BuildSystemPromptInput): string {
   });
 }
 
-function injectResources(
-  text: string,
-  resources: Record<string, string>
-): string {
+function injectResources(text: string, resources: Record<string, string>): string {
   let out = text;
   for (const [uri, body] of Object.entries(resources)) {
-    const tag = `<resource>${uri}</resource>`;
+    const legacyTag = `<resource>${uri}</resource>`;
+    const selfClosingTag = `<resource uri="${uri}"/>`;
     const replacement = `<resource uri="${uri}">\n${body}\n</resource>`;
-    out = out.split(tag).join(replacement);
+    out = out.split(legacyTag).join(replacement);
+    out = out.split(selfClosingTag).join(replacement);
   }
   return out;
 }
