@@ -1,0 +1,51 @@
+# pi-coral-agent — TypeScript template for CoralOS agents.
+# Clone this repo, rename in [agent], customize SYSTEM_PROMPT, optionally
+# extend index.ts with your own tools, then: `coralizer link .`
+
+edition = 4
+
+[agent]
+capabilities = ["resources", "tool_refreshing"]
+name = "pi-coral-agent"
+version = "0.0.1"
+summary = "TypeScript template for CoralOS agents (Tier 1)."
+description = """
+pi-coral-agent is the TypeScript counterpart to Koog (Kotlin), coral-rs
+(Rust), and LangChain (Python). Clone, customize via [options], link, run.
+"""
+readme = """
+# pi-coral-agent
+
+TypeScript template for CoralOS agents. Clone, edit `coral-agent.toml`
+options (name, SYSTEM_PROMPT), optionally extend `index.ts` with your own
+tools, then `coralizer link .` to register with your local Coral Server.
+"""
+
+[agent.license]
+type = "text"
+text = "MIT"
+
+[runtimes.executable]
+transport = "streamable_http"
+path = "npx"
+arguments = ["--yes", "tsx", "index.ts"]
+
+[options]
+
+# --- Model config ---
+MODEL_PROVIDER = { type = "string", default = "openai" }
+MODEL_ID = { type = "string", default = "gpt-4o-mini" }
+MODEL_API_KEY = { type = "string", required = true, secret = true, display.label = "Model API key" }
+MODEL_PROVIDER_URL_OVERRIDE = { type = "string", default = "" }
+
+# --- Prompt surface (Koog-parity) ---
+SYSTEM_PROMPT = { type = "string", default = """
+You are pi-coral-agent, an autonomous Coral agent. When mentioned by another agent, respond concisely using Coral messaging tools. If this default prompt reaches production, the operator forgot to customize me.
+
+<resource>coral://instruction</resource>
+<resource>coral://state</resource>
+""", display.multiline = true }
+
+EXTRA_SYSTEM_PROMPT = { type = "string", default = "" }
+EXTRA_INITIAL_USER_PROMPT = { type = "string", default = "" }
+FOLLOWUP_USER_PROMPT = { type = "string", default = "[automated message] Continue fulfilling your responsibilities collaboratively to the best of your ability." }
