@@ -28,7 +28,6 @@ export async function writeIterationArtifact(
 
 const SECRET_PATTERNS: RegExp[] = [
   /^sk-[A-Za-z0-9\-_]{16,}$/, // OpenAI / generic sk- prefixed keys
-  /^[A-Za-z0-9]{88,}$/, // long base58-ish — Solana private key (64 bytes base58 ≈ 88 chars)
 ];
 
 export function redactSecrets<T>(value: T, secretsFromEnv: string[]): T {
