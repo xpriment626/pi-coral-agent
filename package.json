@@ -1,0 +1,15 @@
+{
+  "name": "pi-coral-agent",
+  "version": "0.0.0",
+  "description": "TypeScript template for building CoralOS agents",
+  "type": "module",
+  "private": true,
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
+  }
+}
