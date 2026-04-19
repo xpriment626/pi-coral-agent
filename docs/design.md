@@ -8,12 +8,16 @@
 
 CoralOS ships three official agent templates — Koog, coral-rs, LangChain — and no TypeScript option. Application developers on the TS ecosystem currently have to roll their own runtime, which leads to reinventing pieces the Coral server already provides (system prompt composition, instruction adaptation per toolset, session lifecycle). This template fills that gap.
 
+Coral templates are distributed as **clone-target agents**: each official template repo IS a directly-registerable Coral agent. Developers clone the template repo, rename/customize via `coral-agent.toml` options, optionally extend the entry point with their own tools, then link with `coralizer link .`. pi-coral-agent follows this convention so a TS developer can `git clone`, `coralizer link`, and have a working agent — same flow as Koog.
+
 The design follows from a docs audit (see `docs/references/`) that distinguished **what Coral provides natively** from **what the template must provide**. Everything Coral provides is delegated. The template earns its keep on: MCP client boilerplate, the LLM loop, environment parsing, tool schema bridging, and debug artifact capture — in that order of load-bearingness.
 
 ## Scope
 
 **In scope (Tier 1):**
 
+- Root `coral-agent.toml` making the template directly registerable (edition 4, `path`+`arguments` runtime schema matching known-good local conventions)
+- Root `index.ts` entry point invoked by `npx tsx index.ts` per the toml
 - MCP connection over streamable HTTP (`connectCoralMcp`)
 - Tool schema sanitizer + name remapping for OpenAI-safe identifiers (`sanitizeJsonSchema`, `remapToolName`)
 - Coral environment variable parsing (`readCoralEnv`)
@@ -52,34 +56,73 @@ These are omitted deliberately. They're either not yet needed by consumers, or (
 
 **Decision rule:** spike outcome determines whether `buildSystemPrompt` is deleted or retained (simplified) in the strip phase.
 
-## API surface (Tier 1)
+## Clone-target shape
 
-Single entry point:
+After cloning pi-coral-agent, a developer sees:
+
+```
+my-atom/
+├── coral-agent.toml       # edit: name, version, default SYSTEM_PROMPT, add domain options
+├── index.ts               # optionally extend: add atom-specific tools
+├── package.json
+├── tsconfig.json
+└── src/                   # template internals — do not typically edit
+    ├── coral-mcp.ts
+    ├── env.ts
+    ├── debug.ts
+    ├── prompt.ts
+    ├── runtime.ts
+    └── index.ts           # named exports for library-style consumers
+```
+
+**Default entry point** (`index.ts` at repo root, invoked by `coral-agent.toml`'s `[runtimes.executable]`):
 
 ```ts
-import { runAtom } from "pi-coral-agent";
-import { myAtomKitTools } from "./my-tools.js";
+import { runAtom } from "./src/index.js";
 
-await runAtom({
-  // Optional — falls back to env.SYSTEM_PROMPT if omitted.
-  // Should contain <resource uri="coral://instruction"/> and <resource uri="coral://state"/>
-  // tags; whether those expand client-side or server-side is decided by Phase 0.
-  systemPrompt: "You are a market trends atom that surfaces trending pools.",
-
-  // Atom-specific tools merged with Coral's coral_* tools at startup.
-  tools: myAtomKitTools,
-
-  // Optional — additional strings to redact from debug artifacts.
-  secretsFromEnv: [process.env.HELIUS_API_KEY ?? ""],
+runAtom().catch((err) => {
+  console.error("[atom] fatal:", err);
+  process.exit(1);
 });
 ```
 
-That's the whole consumer-facing API. Everything else — connection URL, agent ID, session ID, prompt options — comes from Coral-injected env vars.
+Zero-customization path: just change `coral-agent.toml` options (name, system prompt, API keys). Most atoms need nothing more.
 
-Secondary exports (advanced/debug use only):
+**Extension path** — atoms with domain-specific tools edit `index.ts` to pass them through:
 
-- `connectCoralMcp`, `mcpToolsToAgentTools`, `sanitizeJsonSchema`, `remapToolName` — usable for consumers that want to bypass `runAtom` and drive the loop themselves
-- `readCoralEnv` — for consumers that want to read env without running
+```ts
+import { runAtom } from "./src/index.js";
+import { myDomainTools } from "./tools.js";
+
+runAtom({
+  tools: myDomainTools,
+  secretsFromEnv: [process.env.HELIUS_API_KEY ?? ""],
+}).catch((err) => {
+  console.error("[atom] fatal:", err);
+  process.exit(1);
+});
+```
+
+`systemPrompt` stays in the toml as a session-configurable option; the runtime reads it from `env.SYSTEM_PROMPT`. Passing `systemPrompt:` to `runAtom` is an override for advanced cases only.
+
+## Internal API (`runAtom`)
+
+The entry point calls one function:
+
+```ts
+runAtom({
+  systemPrompt?: string,       // override env.SYSTEM_PROMPT
+  tools?: AgentTool<any>[],    // atom-specific tools merged with coral_*
+  secretsFromEnv?: string[],   // extra strings to redact from debug artifacts
+})
+```
+
+Everything else — connection URL, agent ID, session ID, model config — comes from Coral-injected env vars via `readCoralEnv`.
+
+Secondary exports (`src/index.ts`, for library-style consumers):
+
+- `connectCoralMcp`, `mcpToolsToAgentTools`, `sanitizeJsonSchema`, `remapToolName` — bypass `runAtom` and drive the loop manually
+- `readCoralEnv` — read env without running
 - `buildUserTurn` — the Koog-parity initial preamble (consumers may override via their own string)
 - `writeIterationArtifact`, `redactSecrets` — debug helpers
 
@@ -87,6 +130,8 @@ Secondary exports (advanced/debug use only):
 
 | File | Action | Rationale |
 |---|---|---|
+| `coral-agent.toml` (root) | **Create** | Makes the template directly registerable as a Coral agent. Edition 4, `path`+`arguments` runtime schema per working local conventions |
+| `index.ts` (root) | **Create** | Entry point invoked by `npx tsx index.ts` per toml. One-liner calling `runAtom()` from `src/index.ts` |
 | `src/coral-mcp.ts` | Keep, minor cleanup | MCP client + schema bridge is load-bearing and clean |
 | `src/env.ts` | Keep, clarify `CORAL_PROMPT_SYSTEM` precedence | Near-final; only precedence with `SYSTEM_PROMPT` option needs spelled out |
 | `src/debug.ts` | Keep, generalize | Drop the Solana-specific 88-char base58 regex; leave only the OpenAI-style `sk-*` pattern plus explicit secrets-from-env |
@@ -95,7 +140,7 @@ Secondary exports (advanced/debug use only):
 | `src/messages.ts` | **Moved to solana-coralised** | Domain convention, not template concern — no other Coral template ships a payload schema |
 | `src/pi-runtime.test.ts` | Strip 49 tests → ~12 | Delete fixture-2 predicate tests, tool readmit tests; keep MCP/env/payload/redaction tests |
 | `src/prompt.test.ts` | **Deleted** | Fixture-1 byte-equality against Kotlin is a non-goal once `buildSystemPrompt` dies |
-| `src/index.ts` | Update to stripped surface | Export only what Tier 1 exposes |
+| `src/index.ts` | Update to stripped surface | Barrel re-exports for library-style consumers; root `index.ts` imports from here |
 
 ## Proposed stripped `runAtom`
 
@@ -203,15 +248,16 @@ All using nothing but `runAtom({ systemPrompt, tools })` plus a `coral-agent.tom
 
 ## Execution phases
 
-1. **Phase 0 — verification spike.** Resolve `<resource>` tag handling. Blocks all stripping.
-2. **Phase 1 — strip `pi-runtime.ts`.** Delete blocklist, readmit handler, fixture-2 machinery. Keep tests green as you go.
-3. **Phase 2 — resolve prompt.ts.** Based on Phase 0, either delete `buildSystemPrompt` or simplify it. Delete `prompt.test.ts` byte-equality.
-4. **Phase 3 — move `messages.ts` to solana-coralised.** One commit, two repos.
-5. **Phase 4 — generalize `debug.ts`.** Drop Solana regex.
-6. **Phase 5 — consolidate `index.ts`.** Final public API surface.
-7. **Phase 6 — port market-trends atom from solana-coralised.** Validation.
+1. **Phase 0 — scaffold template agent shape.** Root `coral-agent.toml` + root `index.ts`. Verify registerability via `coralizer link .`. This is the Koog-shape the template needs before it's a template.
+2. **Phase 1 — verification spike.** Resolve `<resource>` tag handling. Blocks all stripping.
+3. **Phase 2 — strip `pi-runtime.ts`.** Delete blocklist, readmit handler, fixture-2 machinery. Keep tests green as you go.
+4. **Phase 3 — resolve prompt.ts.** Based on Phase 1, either delete `buildSystemPrompt` or simplify it. Delete `prompt.test.ts` byte-equality.
+5. **Phase 4 — move `messages.ts` to solana-coralised.** One commit, two repos.
+6. **Phase 5 — generalize `debug.ts`.** Drop Solana regex.
+7. **Phase 6 — consolidate `src/index.ts`.** Final public API surface for library-style consumers.
+8. **Phase 7 — live validation.** Link the template root, run a session with a default or session-override SYSTEM_PROMPT, verify end-to-end receive + reply.
 
-Each phase ends with a commit. Phase 0 produces a spike doc; phases 1–6 produce code.
+Each phase ends with a commit. Phase 1 produces a spike doc; phases 0, 2–7 produce code.
 
 ## Out-of-scope considerations (intentional omissions)
 
