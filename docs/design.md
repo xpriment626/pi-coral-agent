@@ -1,6 +1,6 @@
 # pi-coral-agent — Tier 1 Design
 
-**Status:** Draft, pending user review.
+**Status:** Implemented — see [plans/2026-04-19-tier1-strip.md](plans/2026-04-19-tier1-strip.md) and [spikes/tier1-validation-result.md](spikes/tier1-validation-result.md).
 **Date:** 2026-04-19
 **Goal:** First reusable TypeScript template for CoralOS agents, at parity with Koog (Kotlin), coral-rs (Rust), and LangChain (Python).
 
