@@ -48,7 +48,7 @@ These are omitted deliberately. They're either not yet needed by consumers, or (
 
 **Spike procedure:**
 
-1. Create a minimal dummy atom (`pi-coral-agent/spikes/resource-expansion/`) with a coral-agent.toml registering it against local Coral Server.
+1. Create a minimal dummy atom (`pi-coral-agent/spikes/resource-expansion/` — archived 2026-04-20; raw evidence at `docs/spikes/artifacts/`) with a coral-agent.toml registering it against local Coral Server.
 2. System prompt configured via `SYSTEM_PROMPT` option contains literal `<resource uri="coral://state"/>` — no manual expansion by the atom.
 3. Atom runs one LLM turn, writing the exact systemPrompt that goes to the model into a debug artifact.
 4. Compare against current behavior (with manual expansion): does the model see the resource body or the literal `<resource uri="..."/>` tag?

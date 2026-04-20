@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-19
 **Session:** 8f1638c5-7b27-4710-ac33-0878de78a1c5
-**Artifact:** `spikes/resource-expansion/.spike-artifacts/8f1638c5-7b27-4710-ac33-0878de78a1c5.json`
+**Artifact:** `docs/spikes/artifacts/8f1638c5-7b27-4710-ac33-0878de78a1c5.json` (archived 2026-04-20; spike agent code removed, raw evidence preserved)
 
 ## Finding
 
