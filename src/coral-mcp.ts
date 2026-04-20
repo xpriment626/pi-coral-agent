@@ -13,6 +13,22 @@ export function sanitizeJsonSchema(schema: any): any {
   if (Array.isArray(schema)) return schema.map(sanitizeJsonSchema);
   const out: any = { ...schema };
   if (out.type === "integer" || out.type === "number") {
+    // Coerce JSON Schema draft-4 boolean exclusiveMinimum/Maximum into 2020-12
+    // numeric form. zod-to-json-schema (and some upstream libs like
+    // solana-agent-kit) emit `{exclusiveMinimum: true, minimum: N}` which
+    // OpenAI strict mode rejects with "True is not of type 'number'".
+    if (out.exclusiveMinimum === true && typeof out.minimum === "number") {
+      out.exclusiveMinimum = out.minimum;
+      delete out.minimum;
+    } else if (out.exclusiveMinimum === false) {
+      delete out.exclusiveMinimum;
+    }
+    if (out.exclusiveMaximum === true && typeof out.maximum === "number") {
+      out.exclusiveMaximum = out.maximum;
+      delete out.maximum;
+    } else if (out.exclusiveMaximum === false) {
+      delete out.exclusiveMaximum;
+    }
     if (typeof out.maximum === "number" && (out.maximum > INT32_MAX || out.maximum < INT32_MIN)) {
       delete out.maximum;
     }
